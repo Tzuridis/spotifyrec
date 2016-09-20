@@ -29,22 +29,42 @@ app.get('/search/:name', function (req, res) {
 
     searchReq.on('end', function (item) {
         var artist = item.artists.items[0];
-        console.log(artist);
+        // console.log(artist);
         var getRelatedArtists = getRelated(artist.id);
         getRelatedArtists.on('end', function (item) {
             artist.related = item.artists;
-             res.json(artist); 
+            var record = artist.related.length;
+            var count = 0;
+            for (var i = 0; i < artist.related.length; i++) {
+                var getTopTracks = getTracks(artist.related[i].id);
+                // console.log('Artist related', artist.related[i]);
+                getTopTracks.on('end', function (item) {
+                    if(item.tracks != undefined) {
+                        console.log(item.tracks)
+                        
+                    artist.related[i].tracks = item.tracks;
+                    }
+                    count++;
+                    if (count == record) {
+                        res.json(artist);
+                    }
+                });
+                getTopTracks.on('error', function (code) {
+                //    console.log(code)
+                });
+            }
+
         });
-        getRelatedArtists.on('error', function (code){
+        getRelatedArtists.on('error', function (code) {
             res.sendStatus(code);
         });
-       
+
     });
 
     searchReq.on('error', function (code) {
         res.sendStatus(code);
     });
-    
+
 
 });
 
@@ -62,6 +82,22 @@ var getRelated = function (id) {
         });
     return emitter;
 };
+
+
+var getTracks = function (id) {
+    var emitter = new events.EventEmitter();
+    unirest.get('https://api.spotify.com/v1/artists/' + id + '/top-tracks?country=US')
+        .end(function (response) {
+            if (response.ok) {
+                emitter.emit('end', response.body);
+            } else {
+                emitter.emit('error', response.code);
+            }
+        });
+    return emitter;
+}
+
+
 
 
 
